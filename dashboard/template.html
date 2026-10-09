@@ -1,0 +1,573 @@
+<title>Linux News Radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: nagłówek + rząd liczb, jeden pasek filtrów, siatka 2-kolumnowa wykresów, potem lista newsów i tabela filmów. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #fcfcfb;
+  --ink: #0f1412;
+  --ink-2: #4d5551;
+  --muted: #858b87;
+  --grid: #e2e4df;
+  --axis: #c2c6c0;
+  --line: rgba(15, 20, 18, 0.10);
+  --accent: #2a78d6;
+  --accent-wash: rgba(42, 120, 214, 0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab;
+  --seq-ink-light: #0d366b; --seq-ink-dark: #ffffff;
+  --term: #11823b;
+  --f-display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-body: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1211; --surface: #181b1a; --ink: #f4f6f4; --ink-2: #c0c6c2; --muted: #8a908c;
+    --grid: #2a2e2c; --axis: #3a3f3c; --line: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5; --accent-wash: rgba(57, 135, 229, 0.16);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --seq-1: #184f95; --seq-2: #1c5cab; --seq-3: #3987e5; --seq-4: #86b6ef;
+    --seq-ink-light: #ffffff; --seq-ink-dark: #0d366b;
+    --term: #3fbf6a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1211; --surface: #181b1a; --ink: #f4f6f4; --ink-2: #c0c6c2; --muted: #8a908c;
+  --grid: #2a2e2c; --axis: #3a3f3c; --line: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5; --accent-wash: rgba(57, 135, 229, 0.16);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --seq-1: #184f95; --seq-2: #1c5cab; --seq-3: #3987e5; --seq-4: #86b6ef;
+  --seq-ink-light: #ffffff; --seq-ink-dark: #0d366b;
+  --term: #3fbf6a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); margin: 0; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 64px; display: grid; gap: 20px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+.mono { font-family: var(--f-data); }
+.num { font-variant-numeric: tabular-nums; }
+
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; }
+.prompt { font: 500 12px var(--f-data); color: var(--term); letter-spacing: .02em; }
+h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.sub { color: var(--ink-2); max-width: 62ch; margin: 6px 0 0; }
+.range { font: 13px var(--f-data); color: var(--muted); text-align: right; }
+
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.kpi { background: var(--surface); padding: 14px 16px; min-width: 0; }
+.kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.kpi .value { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.2; }
+.kpi .note { font-size: 13px; color: var(--ink-2); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; position: sticky;
+  top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px;
+  border-bottom: 1px solid var(--line); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink-2); border-radius: 999px; padding: 5px 11px; font: 500 13px var(--f-body); cursor: pointer; }
+.chip .sw { width: 10px; height: 10px; border-radius: 3px; }
+.chip[aria-pressed="false"] { opacity: .5; }
+.chip[aria-pressed="false"] .sw { background: transparent !important; outline: 1.5px solid var(--axis); }
+.chip:hover { border-color: var(--axis); }
+.ctl { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+select, input[type="search"] { font: 14px var(--f-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+input[type="search"] { width: 240px; max-width: 100%; }
+.ctl.grow { flex: 1 1 220px; justify-content: flex-end; }
+button.ghost { font: 500 13px var(--f-body); color: var(--accent); background: none; border: 0; cursor: pointer; padding: 6px 4px; }
+.active-filter { font: 12px var(--f-data); color: var(--ink-2); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; }
+.grid.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.panel h2 { font-size: 16px; font-weight: 600; }
+.panel .hint { font-size: 13px; color: var(--muted); margin: 2px 0 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { font-family: var(--f-data); font-size: 11px; fill: var(--muted); }
+svg .lbl { fill: var(--ink-2); font-family: var(--f-body); font-size: 12.5px; }
+svg .val { fill: var(--ink); font-size: 11.5px; }
+.bar-row { cursor: pointer; }
+.bar-row:hover .hit { fill: var(--accent-wash); }
+.bar-row.on .lbl { fill: var(--accent); font-weight: 600; }
+
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.14); border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; min-width: 140px; max-width: 280px; }
+.tip b { font-weight: 600; display: block; margin-bottom: 4px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; }
+.tip .r i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+.tip .r span:last-child { font-family: var(--f-data); }
+
+.feed-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; }
+.feed { list-style: none; margin: 12px 0 0; padding: 0; display: grid; }
+.item { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.imp { width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center; font: 600 17px var(--f-data);
+  line-height: 1; }
+.imp small { display: block; font-size: 9px; font-weight: 500; letter-spacing: .04em; opacity: .8; margin-top: 2px; }
+.imp.t1 { background: var(--seq-1); color: var(--seq-ink-light); }
+.imp.t2 { background: var(--seq-2); color: var(--seq-ink-light); }
+.imp.t3 { background: var(--seq-3); color: #fff; }
+.imp.t4 { background: var(--seq-4); color: var(--seq-ink-dark); }
+.item h3 { font: 600 15.5px/1.35 var(--f-display); margin: 0; text-wrap: pretty; }
+.item p { margin: 4px 0 6px; color: var(--ink-2); max-width: 80ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); align-items: center; }
+.meta .cat { font-family: var(--f-data); color: var(--ink-2); }
+.ents { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ent { font: 12px var(--f-data); color: var(--ink-2); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1px 6px; cursor: pointer; }
+.ent:hover { border-color: var(--accent); color: var(--accent); }
+.dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: 0; }
+.more { margin-top: 10px; font: 500 14px var(--f-body); border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.more:hover { border-color: var(--accent); }
+.empty { padding: 24px 0; color: var(--muted); }
+
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  cursor: pointer; white-space: nowrap; user-select: none; }
+th[aria-sort="ascending"]::after { content: " ↑"; } th[aria-sort="descending"]::after { content: " ↓"; }
+td.n, th.n { text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.d { font-family: var(--f-data); white-space: nowrap; color: var(--ink-2); }
+td.t { min-width: 260px; }
+.pill { font: 500 11.5px var(--f-data); border-radius: 999px; padding: 2px 8px; white-space: nowrap; border: 1px solid var(--line); }
+.pill.warn { color: var(--ink); border-color: #fab219; }
+.pill.warn::before { content: "▲ "; color: #c98500; }
+.pill.ok { color: var(--ink-2); }
+.pill.ok::before { content: "✓ "; color: #0ca30c; }
+
+@media (max-width: 900px) {
+  .grid, .grid.even { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi:last-child { grid-column: span 2; }
+  .range { text-align: left; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 20px 16px 48px; }
+  .kpi .value { font-size: 24px; }
+  input[type="search"] { width: 100%; }
+  .ctl.grow { justify-content: stretch; }
+  .filters { position: static; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .chip, .ent, .more { transition: border-color .15s, opacity .15s, color .15s; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="prompt">$ grep -c news youtube_videos.json</div>
+      <h1>Linux News Radar</h1>
+      <p class="sub">Newsy wyciągnięte z transkrypcji filmów z kanałów o Linuksie i open source. Kliknij kanał, encję albo temat, żeby zawęzić widok.</p>
+    </div>
+    <div class="range" id="range"></div>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Najważniejsze liczby"></section>
+
+  <section class="filters" aria-label="Filtry">
+    <div class="chips" id="chips"></div>
+    <label class="ctl" for="minImp">Ważność od
+      <select id="minImp">
+        <option value="1">wszystkie</option><option value="5">5+</option><option value="7">7+</option>
+        <option value="8">8+</option><option value="9">9+</option>
+      </select>
+    </label>
+    <div class="ctl grow">
+      <span class="active-filter" id="activeFilter"></span>
+      <input type="search" id="q" placeholder="Szukaj w newsach, np. Wayland" aria-label="Szukaj w newsach">
+      <button class="ghost" id="reset" type="button">Wyczyść</button>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Newsy tygodniowo</h2>
+      <p class="hint" id="weekHint">Liczba newsów wg tygodnia publikacji filmu</p>
+      <div class="legend" id="weekLegend"></div>
+      <div id="weekChart"></div>
+    </section>
+    <section class="panel">
+      <h2>Rozkład ważności</h2>
+      <p class="hint">Ocena ważności newsa w skali 1–10</p>
+      <div id="impChart"></div>
+    </section>
+  </div>
+
+  <div class="grid even">
+    <section class="panel">
+      <h2>Najczęstsze encje</h2>
+      <p class="hint">Firmy, projekty i ludzie wymieniani w newsach. Kliknij, żeby filtrować.</p>
+      <div id="entChart"></div>
+    </section>
+    <section class="panel">
+      <h2>Tematy</h2>
+      <p class="hint">Kategorie newsów (warianty liczby pojedynczej i mnogiej połączone)</p>
+      <div id="catChart"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Kanały</h2>
+    <div class="tablewrap"><table id="chanTable"></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="feed-head">
+      <h2>Newsy</h2>
+      <span class="hint" id="feedCount"></span>
+    </div>
+    <ul class="feed" id="feed"></ul>
+    <button class="more" id="more" type="button" hidden>Pokaż więcej</button>
+  </section>
+
+  <section class="panel">
+    <h2>Filmy</h2>
+    <p class="hint">Kliknij nagłówek, żeby posortować. Filmy bez newsów są oznaczone.</p>
+    <div class="tablewrap"><table id="vidTable"></table></div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const videos = DATA.videos;
+const SERIES = ["--s1", "--s2", "--s3", "--s4"];
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = new Intl.NumberFormat("pl-PL");
+const fmtDate = (d) => new Date(d).toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const fmtShort = (d) => d.toLocaleDateString("pl-PL", { day: "numeric", month: "short", timeZone: "UTC" });
+
+// Kanały: kolejność wg liczby filmów, kolor przypisany na stałe (nie zmienia się przy filtrowaniu).
+const chanCount = {};
+videos.forEach((v) => (chanCount[v.channel_id] = (chanCount[v.channel_id] || 0) + 1));
+const channels = Object.keys(chanCount).sort((a, b) => chanCount[b] - chanCount[a] || a.localeCompare(b))
+  .map((id, i) => ({ id, color: SERIES[i % SERIES.length], name: DATA.channelNames[id] || "Kanał " + id.slice(2, 8) + "…",
+    sample: videos.find((v) => v.channel_id === id).title }));
+const chanById = Object.fromEntries(channels.map((c) => [c.id, c]));
+
+// Spłaszczone newsy z odniesieniem do filmu.
+const allNews = [];
+videos.forEach((v) => v.news.forEach((n) => allNews.push({ ...n, video: v })));
+
+const normCat = (c) => c.trim().toLowerCase().replace(/s$/, "");
+const catLabel = {};
+{
+  const forms = {};
+  allNews.forEach((n) => { const k = normCat(n.category); (forms[k] ||= {})[n.category] = (forms[k][n.category] || 0) + 1; });
+  for (const k in forms) catLabel[k] = Object.entries(forms[k]).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+const state = { chans: new Set(channels.map((c) => c.id)), minImp: 1, q: "", entity: null, cat: null, shown: 20,
+  sort: { key: "date", dir: -1 } };
+
+function filteredNews() {
+  const q = state.q.toLowerCase();
+  return allNews.filter((n) => state.chans.has(n.video.channel_id) && n.importance >= state.minImp
+    && (!state.entity || n.entities.includes(state.entity))
+    && (!state.cat || normCat(n.category) === state.cat)
+    && (!q || (n.title + " " + n.summary + " " + n.entities.join(" ") + " " + n.category).toLowerCase().includes(q)));
+}
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById("tip");
+function showTip(e, html) {
+  tip.innerHTML = html; tip.hidden = false;
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+const hideTip = () => (tip.hidden = true);
+
+/* ---------- header + KPI ---------- */
+function renderHeader() {
+  const dates = videos.map((v) => v.published_at).sort();
+  document.getElementById("range").innerHTML =
+    `${videos.length} filmów · ${channels.length} kanały<br>${fmtDate(dates[0])} – ${fmtDate(dates[dates.length - 1])}`;
+}
+
+function renderKpis(news) {
+  const vids = new Set(news.map((n) => n.video.video_id));
+  const avg = news.length ? news.reduce((s, n) => s + n.importance, 0) / news.length : 0;
+  const high = news.filter((n) => n.importance >= 8).length;
+  const scopeVids = videos.filter((v) => state.chans.has(v.channel_id));
+  const noNews = scopeVids.filter((v) => !v.news.length).length;
+  const ents = new Set(news.flatMap((n) => n.entities));
+  const tiles = [
+    ["Newsy", fmt.format(news.length), `z ${fmt.format(vids.size)} filmów`],
+    ["Średnia ważność", avg.toFixed(1).replace(".", ","), "w skali 1–10"],
+    ["Ważne (8+)", fmt.format(high), news.length ? Math.round((high / news.length) * 100) + "% newsów" : "–"],
+    ["Encje", fmt.format(ents.size), "unikalnych nazw"],
+    ["Filmy bez newsów", fmt.format(noNews), `z ${scopeVids.length} w wybranych kanałach`],
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(([l, v, n]) =>
+    `<div class="kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+}
+
+/* ---------- filtry ---------- */
+function renderChips() {
+  document.getElementById("chips").innerHTML = channels.map((c) =>
+    `<button class="chip" type="button" data-id="${c.id}" aria-pressed="${state.chans.has(c.id)}" title="${esc(c.sample)}">
+      <i class="sw" style="background:var(${c.color})"></i>${esc(c.name)}</button>`).join("");
+  document.getElementById("weekLegend").innerHTML = channels.filter((c) => state.chans.has(c.id))
+    .map((c) => `<span><i style="background:var(${c.color})"></i>${esc(c.name)}</span>`).join("");
+  const af = [];
+  if (state.entity) af.push("encja: " + state.entity);
+  if (state.cat) af.push("temat: " + catLabel[state.cat]);
+  document.getElementById("activeFilter").textContent = af.join(" · ");
+}
+
+/* ---------- wykres tygodniowy (słupki skumulowane) ---------- */
+const WEEK = 7 * 864e5;
+const weekStart = (d) => { const t = new Date(d); const day = (t.getUTCDay() + 6) % 7;
+  return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate() - day); };
+const CUTOFF = Date.UTC(2026, 5, 29); // tydzień od 29 cze 2026; wcześniejsze filmy są nieliczne -> jeden słupek
+
+function renderWeeks(news) {
+  const el = document.getElementById("weekChart");
+  const maxT = Math.max(...videos.map((v) => weekStart(v.published_at)));
+  const buckets = [{ key: "old", label: "starsze", long: "Starsze filmy (przed 29 cze 2026)" }];
+  for (let t = CUTOFF; t <= maxT; t += WEEK) {
+    const d = new Date(t);
+    buckets.push({ key: t, label: fmtShort(d), long: `Tydzień od ${fmtShort(d)}` });
+  }
+  const idx = Object.fromEntries(buckets.map((b, i) => [b.key, i]));
+  const counts = buckets.map(() => Object.fromEntries(channels.map((c) => [c.id, 0])));
+  news.forEach((n) => { const w = weekStart(n.video.published_at); counts[w < CUTOFF ? 0 : idx[w]][n.video.channel_id]++; });
+  const totals = counts.map((c) => Object.values(c).reduce((a, b) => a + b, 0));
+
+  const W = Math.max(320, el.clientWidth), H = 240, m = { t: 12, r: 6, b: 26, l: 30 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const maxV = Math.max(5, ...totals);
+  const step = maxV <= 20 ? 5 : maxV <= 60 ? 10 : maxV <= 150 ? 25 : 50;
+  const top = Math.ceil(maxV / step) * step;
+  const y = (v) => m.t + ih - (v / top) * ih;
+  const bw = iw / buckets.length, barW = Math.max(6, Math.min(34, bw * 0.66));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Liczba newsów tygodniowo wg kanału">`;
+  for (let v = 0; v <= top; v += step)
+    s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(${v ? "--grid" : "--axis"})" stroke-width="1"/>
+          <text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  const labelEvery = bw < 58 ? 2 : 1;
+  buckets.forEach((b, i) => {
+    const cx = m.l + bw * i + bw / 2, x = cx - barW / 2;
+    let acc = 0;
+    const segs = channels.filter((c) => counts[i][c.id] > 0);
+    segs.forEach((c, j) => {
+      const v = counts[i][c.id], y0 = y(acc), y1 = y(acc + v);
+      const isTop = j === segs.length - 1;
+      const h = Math.max(1, y0 - y1 - (isTop ? 0 : 2));
+      // górny segment ma zaokrąglony koniec, reszta prosta; 2px przerwy w kolorze tła między segmentami
+      s += isTop
+        ? `<path d="${roundTop(x, y1, barW, h, Math.min(4, h, barW / 2))}" fill="var(${c.color})"/>`
+        : `<rect x="${x}" y="${y1 + 2}" width="${barW}" height="${Math.max(0, y0 - y1 - 2)}" fill="var(${c.color})"/>`;
+      acc += v;
+    });
+    if (i % labelEvery === 0 || i === buckets.length - 1)
+      s += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${b.label}</text>`;
+    s += `<rect class="hitcol" data-i="${i}" x="${m.l + bw * i}" y="${m.t}" width="${bw}" height="${ih}" fill="transparent"/>`;
+  });
+  s += `</svg>`;
+  el.innerHTML = s;
+  el.querySelectorAll(".hitcol").forEach((r) => {
+    const i = +r.dataset.i;
+    r.addEventListener("mousemove", (e) => showTip(e, `<b>${buckets[i].long}</b>` +
+      channels.filter((c) => state.chans.has(c.id)).map((c) =>
+        `<div class="r"><span><i style="background:var(${c.color})"></i>${esc(c.name)}</span><span>${counts[i][c.id]}</span></div>`).join("") +
+      `<div class="r" style="margin-top:4px;border-top:1px solid var(--line);padding-top:4px"><span>Razem</span><span>${totals[i]}</span></div>`));
+    r.addEventListener("mouseleave", hideTip);
+  });
+}
+function roundTop(x, y, w, h, r) {
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+/* ---------- histogram ważności ---------- */
+function renderImportance(news) {
+  const el = document.getElementById("impChart");
+  const counts = Array.from({ length: 10 }, (_, i) => news.filter((n) => n.importance === i + 1).length);
+  const W = Math.max(280, el.clientWidth), H = 240, m = { t: 18, r: 4, b: 26, l: 4 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, maxV = Math.max(1, ...counts);
+  const bw = iw / 10, barW = Math.min(30, bw * 0.7);
+  const peak = counts.indexOf(maxV);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Rozkład ważności newsów">
+    <line x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="var(--axis)"/>`;
+  counts.forEach((v, i) => {
+    const cx = m.l + bw * i + bw / 2, h = (v / maxV) * ih;
+    if (v) s += `<path d="${roundTop(cx - barW / 2, m.t + ih - h, barW, h, Math.min(4, h))}" fill="var(${i + 1 >= state.minImp ? "--s1" : "--grid"})"/>`;
+    if (i === peak && v) s += `<text class="val" x="${cx}" y="${m.t + ih - h - 6}" text-anchor="middle">${v}</text>`;
+    s += `<text x="${cx}" y="${H - 8}" text-anchor="middle">${i + 1}</text>
+      <rect class="hb" data-i="${i}" x="${m.l + bw * i}" y="${m.t}" width="${bw}" height="${ih}" fill="transparent"/>`;
+  });
+  el.innerHTML = s + `</svg>`;
+  const total = counts.reduce((a, b) => a + b, 0) || 1;
+  el.querySelectorAll(".hb").forEach((r) => {
+    const i = +r.dataset.i;
+    r.addEventListener("mousemove", (e) => showTip(e, `<b>Ważność ${i + 1}</b><div class="r"><span>Newsy</span><span>${counts[i]}</span></div>
+      <div class="r"><span>Udział</span><span>${Math.round((counts[i] / total) * 100)}%</span></div>`));
+    r.addEventListener("mouseleave", hideTip);
+  });
+}
+
+/* ---------- poziome rankingi ---------- */
+function renderRank(elId, rows, activeKey, onPick, unit) {
+  const el = document.getElementById(elId);
+  if (!rows.length) { el.innerHTML = `<p class="empty">Brak danych dla tych filtrów.</p>`; return; }
+  const W = Math.max(280, el.clientWidth), rowH = 26, labelW = Math.min(190, W * 0.42), valW = 34;
+  const H = rows.length * rowH + 4, maxV = rows[0][1], bx = labelW + 8, bwMax = W - bx - valW;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ranking">`;
+  rows.forEach(([key, v, label], i) => {
+    const y = i * rowH, w = Math.max(2, (v / maxV) * bwMax);
+    const text = label.length > 28 ? label.slice(0, 27) + "…" : label;
+    s += `<g class="bar-row${key === activeKey ? " on" : ""}" data-k="${esc(key)}" tabindex="0" role="button" aria-label="${esc(label)}: ${v}">
+      <rect class="hit" x="0" y="${y}" width="${W}" height="${rowH}" rx="4" fill="transparent"/>
+      <text class="lbl" x="${labelW}" y="${y + 17}" text-anchor="end">${esc(text)}</text>
+      <path d="M${bx},${y + 7}H${bx + w - 4}Q${bx + w},${y + 7} ${bx + w},${y + 11}V${y + 15}Q${bx + w},${y + 19} ${bx + w - 4},${y + 19}H${bx}Z"
+        fill="var(${key === activeKey || !activeKey ? "--s1" : "--seq-2"})"/>
+      <text class="val" x="${bx + w + 6}" y="${y + 17}">${v}</text></g>`;
+  });
+  el.innerHTML = s + `</svg>`;
+  el.querySelectorAll(".bar-row").forEach((g) => {
+    const row = rows.find((r) => String(r[0]) === g.dataset.k);
+    g.addEventListener("click", () => onPick(row[0]));
+    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(row[0]); } });
+    g.addEventListener("mousemove", (e) => showTip(e, `<b>${esc(row[2])}</b><div class="r"><span>${unit}</span><span>${row[1]}</span></div>`));
+    g.addEventListener("mouseleave", hideTip);
+  });
+}
+
+function topEntities(news) {
+  const c = {};
+  news.forEach((n) => new Set(n.entities).forEach((e) => (c[e] = (c[e] || 0) + 1)));
+  return Object.entries(c).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 14).map(([k, v]) => [k, v, k]);
+}
+function topCats(news) {
+  const c = {};
+  news.forEach((n) => { const k = normCat(n.category); c[k] = (c[k] || 0) + 1; });
+  return Object.entries(c).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 14).map(([k, v]) => [k, v, catLabel[k]]);
+}
+
+/* ---------- tabela kanałów ---------- */
+function renderChannels() {
+  const rows = channels.map((c) => {
+    const vs = videos.filter((v) => v.channel_id === c.id);
+    const ns = vs.flatMap((v) => v.news);
+    const last = vs.map((v) => v.published_at).sort().pop();
+    return { c, vids: vs.length, news: ns.length, per: ns.length / vs.length,
+      avg: ns.length ? ns.reduce((s, n) => s + n.importance, 0) / ns.length : 0, last };
+  });
+  document.getElementById("chanTable").innerHTML = `<thead><tr><th>Kanał</th><th>Przykładowy film</th><th class="n">Filmy</th>
+    <th class="n">Newsy</th><th class="n">Newsy / film</th><th class="n">Śr. ważność</th><th class="n">Ostatni film</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr><td><span class="dot" style="background:var(${r.c.color})"></span>
+      <a href="https://www.youtube.com/channel/${r.c.id}" target="_blank" rel="noopener">${esc(r.c.name)}</a>
+      <div class="mono" style="font-size:11px;color:var(--muted)">${r.c.id}</div></td>
+      <td class="t">${esc(r.c.sample)}</td><td class="n">${r.vids}</td><td class="n">${r.news}</td>
+      <td class="n">${r.per.toFixed(1).replace(".", ",")}</td><td class="n">${r.avg.toFixed(1).replace(".", ",")}</td>
+      <td class="d">${fmtDate(r.last)}</td></tr>`).join("") + `</tbody>`;
+}
+
+/* ---------- lista newsów ---------- */
+function tier(i) { return i >= 9 ? "t4" : i >= 7 ? "t3" : i >= 5 ? "t2" : "t1"; }
+function renderFeed(news) {
+  const sorted = [...news].sort((a, b) => b.importance - a.importance || b.video.published_at.localeCompare(a.video.published_at));
+  const shown = sorted.slice(0, state.shown);
+  document.getElementById("feedCount").textContent =
+    `${fmt.format(news.length)} newsów · posortowane wg ważności, potem daty`;
+  document.getElementById("feed").innerHTML = shown.length ? shown.map((n) => {
+    const c = chanById[n.video.channel_id];
+    return `<li class="item"><div class="imp ${tier(n.importance)}" title="Ważność ${n.importance}/10">
+        <span>${n.importance}<small>/10</small></span></div>
+      <div style="min-width:0"><h3>${esc(n.title)}</h3><p>${esc(n.summary)}</p>
+        <div class="meta"><span class="cat">${esc(n.category)}</span>
+          <span><span class="dot" style="background:var(${c.color})"></span>${esc(c.name)}</span>
+          <span>${fmtDate(n.video.published_at)}</span>
+          <a href="${esc(n.video.url)}" target="_blank" rel="noopener" title="${esc(n.video.title)}">▶ film</a>
+          <span class="mono">pewność ${Math.round(n.confidence * 100)}%</span></div>
+        <div class="ents">${n.entities.map((e) => `<button type="button" class="ent" data-e="${esc(e)}">${esc(e)}</button>`).join("")}</div>
+      </div></li>`;
+  }).join("") : `<li class="empty">Żaden news nie pasuje do filtrów. Wyczyść filtry albo zmień wyszukiwanie.</li>`;
+  const more = document.getElementById("more");
+  more.hidden = sorted.length <= state.shown;
+  more.textContent = `Pokaż więcej (${fmt.format(sorted.length - shown.length)} pozostało)`;
+}
+
+/* ---------- tabela filmów ---------- */
+function renderVideos() {
+  const vs = videos.filter((v) => state.chans.has(v.channel_id));
+  const k = state.sort.key, d = state.sort.dir;
+  const val = { date: (v) => v.published_at, title: (v) => v.title.toLowerCase(), chan: (v) => chanById[v.channel_id].name,
+    news: (v) => v.news.length, len: (v) => v.transcript_len,
+    imp: (v) => v.news.length ? v.news.reduce((s, n) => s + n.importance, 0) / v.news.length : -1 }[k];
+  vs.sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * d);
+  const cols = [["date", "Data", ""], ["chan", "Kanał", ""], ["title", "Tytuł", ""], ["news", "Newsy", "n"],
+    ["imp", "Śr. ważność", "n"], ["len", "Transkrypcja", "n"]];
+  const t = document.getElementById("vidTable");
+  t.innerHTML = `<thead><tr>${cols.map(([key, l, cl]) => `<th class="${cl}" data-k="${key}" tabindex="0"
+      aria-sort="${key === k ? (d > 0 ? "ascending" : "descending") : "none"}">${l}</th>`).join("")}</tr></thead><tbody>` +
+    vs.map((v) => {
+      const c = chanById[v.channel_id];
+      const avg = v.news.length ? (v.news.reduce((s, n) => s + n.importance, 0) / v.news.length).toFixed(1).replace(".", ",") : "–";
+      return `<tr><td class="d">${fmtDate(v.published_at)}</td>
+        <td style="white-space:nowrap"><span class="dot" style="background:var(${c.color})"></span>${esc(c.name)}</td>
+        <td class="t"><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title)}</a></td>
+        <td class="n">${v.news.length ? v.news.length : `<span class="pill warn">brak</span>`}</td>
+        <td class="n">${avg}</td><td class="n">${fmt.format(Math.round(v.transcript_len / 1000))} tys. zn.</td></tr>`;
+    }).join("") + `</tbody>`;
+  t.querySelectorAll("th").forEach((th) => {
+    const go = () => { const key = th.dataset.k; state.sort = { key, dir: state.sort.key === key ? -state.sort.dir : (key === "title" || key === "chan" ? 1 : -1) }; renderVideos(); };
+    th.addEventListener("click", go);
+    th.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  });
+}
+
+/* ---------- render + zdarzenia ---------- */
+function render() {
+  const news = filteredNews();
+  renderChips(); renderKpis(news); renderWeeks(news); renderImportance(news);
+  renderRank("entChart", topEntities(news), state.entity, (k) => { state.entity = state.entity === k ? null : k; state.shown = 20; render(); }, "Newsy");
+  renderRank("catChart", topCats(news), state.cat, (k) => { state.cat = state.cat === k ? null : k; state.shown = 20; render(); }, "Newsy");
+  renderFeed(news); renderVideos();
+}
+
+document.getElementById("chips").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  const id = b.dataset.id;
+  if (state.chans.has(id) && state.chans.size === 1) state.chans = new Set(channels.map((c) => c.id));
+  else if (state.chans.size === channels.length) state.chans = new Set([id]);
+  else state.chans.has(id) ? state.chans.delete(id) : state.chans.add(id);
+  state.shown = 20; render();
+});
+document.getElementById("minImp").addEventListener("change", (e) => { state.minImp = +e.target.value; state.shown = 20; render(); });
+let qt;
+document.getElementById("q").addEventListener("input", (e) => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); state.shown = 20; render(); }, 150); });
+document.getElementById("reset").addEventListener("click", () => {
+  Object.assign(state, { chans: new Set(channels.map((c) => c.id)), minImp: 1, q: "", entity: null, cat: null, shown: 20 });
+  document.getElementById("q").value = ""; document.getElementById("minImp").value = "1"; render();
+});
+document.getElementById("more").addEventListener("click", () => { state.shown += 30; renderFeed(filteredNews()); });
+document.getElementById("feed").addEventListener("click", (e) => {
+  const b = e.target.closest(".ent"); if (!b) return;
+  state.entity = b.dataset.e; state.shown = 20; render();
+  document.querySelector(".filters").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+});
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 120); });
+
+renderHeader(); renderChannels(); render();
+</script>
